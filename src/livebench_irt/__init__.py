@@ -4,6 +4,7 @@ from .diagnostics import (
     item_total_correlation,
 )
 from .irt import IRTFit, bootstrap_theta, fit_2pl, flag_bad_items, rank_confidence_sets
+from .mml import MMLFit, fit_2pl_mml
 
 __all__ = [
     "IRTFit",
@@ -14,4 +15,6 @@ __all__ = [
     "ItemDiagnostics",
     "bootstrap_item_diagnostics",
     "item_total_correlation",
+    "MMLFit",
+    "fit_2pl_mml",
 ]
