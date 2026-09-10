@@ -73,9 +73,32 @@ def test_handles_missing_entries():
     assert r > 0.90
 
 
+def test_flags_separated_models():
+    # A model that gets everything wrong has no finite MLE for ability. It must
+    # be flagged, kept finite, and kept out of the standardisation so that it
+    # does not rescale every other model.
+    Y, theta, a, b = simulate()
+    Y[0, :] = 0.0  # answered everything, got everything wrong
+    Y[1, 50:] = np.nan  # only attempted 50 questions
+    Y[1, :50] = 0.0  # and got all of those wrong too
+    Y[2, :] = 1.0  # got everything right
+    fit = fit_2pl(Y)
+
+    flagged = set(np.where(fit.separated_models)[0])
+    print(f"separated models flagged: {sorted(flagged)}")
+    assert {0, 1, 2} <= flagged
+    assert np.isfinite(fit.theta).all()
+
+    ok = fit.theta[~fit.separated_models]
+    print(f"non-separated theta: mean {ok.mean():.3f}, sd {ok.std():.3f}")
+    assert abs(ok.mean()) < 1e-6 and abs(ok.std() - 1) < 1e-6
+    assert len(fit.leaderboard()) == len(fit.theta) - len(flagged)
+
+
 if __name__ == "__main__":
     test_recovers_ability_ranking()
     test_recovers_difficulty()
     test_finds_planted_dead_items()
     test_handles_missing_entries()
+    test_flags_separated_models()
     print("all passed")

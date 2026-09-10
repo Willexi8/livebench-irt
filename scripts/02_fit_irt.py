@@ -56,7 +56,8 @@ if __name__ == "__main__":
 
     # ---- the tables that go in the email --------------------------------
     mean_score = raw_leaderboard(df, category=category)
-    order = np.argsort(-fit.theta)
+    # separated models have no identified ability -- report them, rank them last
+    order = np.argsort(-np.where(fit.separated_models, -np.inf, fit.theta))
     table = pd.DataFrame(
         {
             "irt_rank": np.arange(1, len(order) + 1),
@@ -65,6 +66,7 @@ if __name__ == "__main__":
             "rank_lo": lo_rank[order].astype(int),
             "rank_hi": hi_rank[order].astype(int),
             "mean_score": [mean_score.get(m, np.nan) for m in fit.models[order]],
+            "separated": fit.separated_models[order],
         }
     )
     table.to_csv(ROOT / f"leaderboard{suffix}.csv", index=False)
@@ -75,14 +77,20 @@ if __name__ == "__main__":
     bad.to_csv(ROOT / f"bad_questions{suffix}.csv", index=False)
 
     # how many published adjacent pairs are actually indistinguishable?
+    ranked = table[~table.separated].reset_index(drop=True)
     overlapping = sum(
         1
-        for i in range(len(table) - 1)
-        if table.rank_hi.iloc[i] >= table.rank_lo.iloc[i + 1]
+        for i in range(len(ranked) - 1)
+        if ranked.rank_hi.iloc[i] >= ranked.rank_lo.iloc[i + 1]
     )
+    n_sep = int(table.separated.sum())
+    if n_sep:
+        print(f"\n{n_sep} models scored all-0 or all-1: ability not identified, excluded from ranking")
+        for m in table.model[table.separated]:
+            print(f"    {m}")
     print(f"\n{len(bad)} questions with discrimination < 0.15")
     print(
-        f"{overlapping} of {len(table) - 1} adjacent leaderboard pairs have "
+        f"{overlapping} of {len(ranked) - 1} adjacent leaderboard pairs have "
         f"overlapping rank intervals"
     )
     print(f"\nfigures -> {FIGURES}/   tables -> {ROOT}/")
