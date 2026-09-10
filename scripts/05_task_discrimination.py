@@ -99,32 +99,61 @@ def main():
             gap = groups[a].mean() - groups[b].mean()
             print(f"  {a:20s} vs {b:20s}  mean gap {gap:+.3f}  p={p_adj:.4f}")
 
-    # ---- figure ---------------------------------------------------------
+    # ---- figures --------------------------------------------------------
+    # Two of them, deliberately. The headline claim is about binary-scored
+    # tasks only, so it gets a figure containing only those, with pass rates in
+    # the legend: the attenuation objection ("that task just has a more extreme
+    # pass rate") is then answered by the figure itself rather than by a table
+    # the reader has to be holding at the same time. The all-tasks version is
+    # kept as context, where the dashed curves cannot be mistaken for evidence.
     FIGURES.mkdir(exist_ok=True)
-    fig, ax = plt.subplots(figsize=(7, 5))
-    palette = plt.cm.viridis(np.linspace(0.1, 0.85, len(summary)))
-    for color, task in zip(palette, summary.index):
-        vals = d.loc[d.task == task, "r"].values
-        x, y = ecdf(vals)
-        style = "-" if task in binary_tasks else "--"
-        ax.step(
-            x, y, style, where="post", color=color, linewidth=1.6,
-            label=f"{task} (n={len(vals)}, mean {vals.mean():.2f})",
-        )
-    ax.set_xlabel("item-total correlation")
-    ax.set_ylabel("cumulative fraction of questions")
-    ax.set_title("Item discrimination by task")  # descriptive: let the curves argue
-    ax.legend(fontsize=7.5, loc="lower right", framealpha=0.92, edgecolor="none")
-    ax.grid(alpha=0.2, linewidth=0.5)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
-    ax.text(
-        0.02, 0.97, "solid = binary-scored\ndashed = graded or continuous",
-        transform=ax.transAxes, fontsize=7.5, va="top", color="#555555",
+
+    def draw(tasks, path, title, show_pass_rate):
+        fig, ax = plt.subplots(figsize=(7, 5))
+        palette = plt.cm.viridis(np.linspace(0.1, 0.85, len(tasks)))
+        for color, task in zip(palette, tasks):
+            vals = d.loc[d.task == task, "r"].values
+            x, y = ecdf(vals)
+            label = f"{task} (n={len(vals)}, mean r {vals.mean():.2f}"
+            if show_pass_rate:
+                label += f", pass {summary.pass_rate[task]:.2f}"
+            label += ")"
+            ax.step(
+                x, y, "-" if task in binary_tasks else "--", where="post",
+                color=color, linewidth=1.8, label=label,
+            )
+        ax.set_xlabel("item-total correlation")
+        ax.set_ylabel("cumulative fraction of questions")
+        ax.set_title(title)  # descriptive: let the curves argue
+        ax.legend(fontsize=8, loc="lower right", framealpha=0.92, edgecolor="none")
+        ax.grid(alpha=0.2, linewidth=0.5)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+        if not show_pass_rate:
+            ax.text(
+                0.02, 0.97, "solid = binary-scored\ndashed = graded or continuous",
+                transform=ax.transAxes, fontsize=7.5, va="top", color="#555555",
+            )
+        fig.tight_layout()
+        fig.savefig(path, dpi=200)
+        plt.close(fig)
+
+    binary_ordered = [t for t in summary.index if t in binary_tasks]
+    draw(
+        binary_ordered,
+        FIGURES / "task_discrimination_binary.png",
+        "Item discrimination, binary-scored tasks",
+        show_pass_rate=True,
     )
-    fig.tight_layout()
-    fig.savefig(FIGURES / "task_discrimination.png", dpi=200)
-    print(f"\nfigure -> {FIGURES / 'task_discrimination.png'}")
+    draw(
+        list(summary.index),
+        FIGURES / "task_discrimination.png",
+        "Item discrimination by task",
+        show_pass_rate=False,
+    )
+
+    print(f"\nfigures -> {FIGURES / 'task_discrimination_binary.png'} (headline)")
+    print(f"            {FIGURES / 'task_discrimination.png'} (all tasks)")
 
 
 if __name__ == "__main__":
