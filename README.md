@@ -277,6 +277,13 @@ tests/               parameter recovery, separation, scale invariance
 
 ## Status
 
-Work in progress. Test equating across monthly question rotations — the obvious
-next question for a benchmark that replaces its questions to resist
-contamination — is not implemented.
+Work in progress.
+
+Test equating across monthly question rotations is the obvious next question for
+a benchmark that replaces its questions to resist contamination: when the
+question set changes, a score that drops could mean the model got worse or the
+questions got harder, and equating separates those. It is **not implemented, and
+not implementable from the public data**. `livebench/model_judgment` distributes
+a single snapshot — re-downloading returns byte-identical content — so there is
+no cross-release overlap to link releases through. It would need per-question
+judgments from two or more releases.
