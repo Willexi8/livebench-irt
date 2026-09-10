@@ -87,6 +87,8 @@ Among binary-scored tasks, the whole distribution of item discrimination moves:
 | coding_completion | 50 | 0.429 | 0.151 | 0.344 |
 | LCB_generation (test cases) | 73 | 0.483 | 0.151 | 0.427 |
 
+![Item discrimination by task, binary-scored only](figures/task_discrimination_binary.png)
+
 Kruskal-Wallis H = 28.6, p = 6.3 × 10⁻⁷. Pairwise with Holm correction: typos
 vs LCB_generation, gap −0.142, p < 0.0001; typos vs coding_completion, gap
 −0.088, p = 0.0046. (coding_completion vs LCB_generation, p = 0.058 — same
