@@ -15,10 +15,10 @@ matplotlib.use("Agg")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from livebench_irt.diagnostics import bootstrap_item_diagnostics  # noqa: E402
 from livebench_irt.irt import (  # noqa: E402
     bootstrap_theta,
     fit_2pl,
-    flag_bad_items,
     rank_confidence_sets,
 )
 from livebench_irt.load import build_matrix, load_judgments, raw_leaderboard  # noqa: E402
@@ -29,7 +29,9 @@ from livebench_irt.plots import (  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 FIGURES = ROOT / "figures"
-N_BOOT = 200
+N_BOOT = 200          # bootstrap draws for ability (resamples questions)
+N_BOOT_ITEMS = 400    # bootstrap draws for item diagnostics (resamples models)
+R_THRESHOLD = 0.2     # item-total correlation below which a question is weak
 
 if __name__ == "__main__":
     category = sys.argv[1] if len(sys.argv) > 1 else None
@@ -71,10 +73,15 @@ if __name__ == "__main__":
     )
     table.to_csv(ROOT / f"leaderboard{suffix}.csv", index=False)
 
-    bad = pd.DataFrame(
-        flag_bad_items(fit), columns=["question_id", "discrimination", "difficulty"]
-    )
-    bad.to_csv(ROOT / f"bad_questions{suffix}.csv", index=False)
+    # Item diagnostics: item-total correlation with bootstrap intervals over the
+    # model panel. This replaces a fixed cutoff on the 2PL discrimination, which
+    # was not comparable across fits -- see diagnostics.py for the numbers.
+    diag = bootstrap_item_diagnostics(Y, mask, fit.theta, items=items, n_boot=N_BOOT_ITEMS)
+    cols = ["question_id", "r", "ci_lo", "ci_hi", "n_models"]
+    weak = pd.DataFrame(diag.uninformative(threshold=R_THRESHOLD), columns=cols)
+    unsure = pd.DataFrame(diag.inconclusive(threshold=R_THRESHOLD), columns=cols)
+    weak.to_csv(ROOT / f"weak_questions{suffix}.csv", index=False)
+    unsure.to_csv(ROOT / f"inconclusive_questions{suffix}.csv", index=False)
 
     # how many published adjacent pairs are actually indistinguishable?
     ranked = table[~table.separated].reset_index(drop=True)
@@ -88,7 +95,14 @@ if __name__ == "__main__":
         print(f"\n{n_sep} models scored all-0 or all-1: ability not identified, excluded from ranking")
         for m in table.model[table.separated]:
             print(f"    {m}")
-    print(f"\n{len(bad)} questions with discrimination < 0.15")
+    print(
+        f"\n{len(weak)} questions confidently uninformative "
+        f"(95% CI upper bound below {R_THRESHOLD})"
+    )
+    print(
+        f"{len(unsure)} more look weak but their intervals cannot rule it out "
+        f"-- not evidence either way"
+    )
     print(
         f"{overlapping} of {len(ranked) - 1} adjacent leaderboard pairs have "
         f"overlapping rank intervals"
