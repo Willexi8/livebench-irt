@@ -94,6 +94,8 @@ vs LCB_generation, gap −0.142, p < 0.0001; typos vs coding_completion, gap
 −0.088, p = 0.0046. (coding_completion vs LCB_generation, p = 0.058 — same
 direction, not significant.)
 
+![Item discrimination on binary-scored tasks](figures/task_discrimination_binary.png)
+
 **The attenuation objection does not apply.** Point-biserial correlation is
 attenuated as the pass rate moves away from 0.5, so a sceptic should ask whether
 this ordering is just the pass-rate ordering. It is the reverse: `typos` sits
@@ -238,11 +240,9 @@ synthetic checks the prior costs nothing in recovery (r = 0.9920 either way).
 git clone https://github.com/Willexi8/livebench-irt.git
 cd livebench-irt
 python -m venv .venv && source .venv/Scripts/activate   # bin/activate on Unix
-pip install -r requirements.txt
+pip install -e ".[dev]"
 
-python tests/test_irt.py
-python tests/test_diagnostics.py
-python tests/test_mml.py
+pytest
 
 python scripts/00_smoke_test.py     # synthetic data with known parameters
 python scripts/02_fit_irt.py        # verify the pipeline before the real download
@@ -270,7 +270,7 @@ src/livebench_irt/
     diagnostics.py   item-total correlation with bootstrap intervals
     mml.py           marginal MLE: EM over Gauss-Hermite quadrature, EAP ability
     load.py          download, cache, reshape into a score matrix
-    plots.py         leaderboard with error bars, difficulty-discrimination map
+    plots.py         leaderboard with error bars, item diagnostics with intervals
 scripts/             00 smoke test, 01 download, 02 main, 03-06 as above
 tests/               parameter recovery, separation, scale invariance
 ```
