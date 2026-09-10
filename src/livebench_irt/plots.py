@@ -39,19 +39,48 @@ def leaderboard_with_error_bars(fit, boot_theta, top_n=30, ax=None, level=0.95):
     return ax
 
 
-def difficulty_discrimination(fit, a_threshold=0.15, ax=None):
-    """Figure 2. Every question as a point. The flat band along the bottom is
-    the part of the benchmark that is not measuring anything."""
+def item_diagnostics(diag, n_show=40, threshold=0.2, ax=None):
+    """Figure 2. The weakest questions, each with its confidence interval.
+
+    This replaces an earlier plot of the 2PL discrimination `a_i` against
+    difficulty, with a horizontal line at a fixed cutoff. That plot had two
+    problems and both of them are the subject of findings in this repository:
+    `a_i` is not comparable across fits, and a point estimate with no interval
+    cannot distinguish a weak question from an under-answered one. Drawing it
+    would have contradicted the analysis it was illustrating.
+
+    Questions whose whole interval sits below the threshold are marked; the
+    rest are drawn in grey, because a low point estimate on its own is not
+    evidence.
+    """
     if ax is None:
-        _, ax = plt.subplots(figsize=(6.5, 4.5))
-    dead = fit.a < a_threshold
-    ax.scatter(fit.b[~dead], fit.a[~dead], s=7, alpha=0.45, color="#1a1a1a", label="informative")
-    ax.scatter(fit.b[dead], fit.a[dead], s=10, alpha=0.8, color="#c1440e", label="a < threshold")
-    ax.axhline(a_threshold, linestyle="--", linewidth=0.8, color="#c1440e", alpha=0.6)
-    ax.set_xlabel("difficulty (b)")
-    ax.set_ylabel("discrimination (a)")
-    ax.set_title(f"{dead.sum()} of {len(fit.a)} questions carry almost no signal")
-    ax.legend(frameon=False, fontsize=8)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
+        _, ax = plt.subplots(figsize=(6.5, 0.16 * n_show + 1.5))
+
+    ok = np.isfinite(diag.r) & np.isfinite(diag.lo)
+    idx = np.where(ok)[0]
+    idx = idx[np.argsort(diag.r[idx])][:n_show][::-1]
+    y = np.arange(len(idx))
+    confident = diag.hi[idx] < threshold
+
+    for mark, colour, label in ((confident, "#c1440e", f"CI entirely below {threshold}"),
+                                (~confident, "#9a9a9a", "interval reaches above")):
+        if not mark.any():
+            continue
+        sel = np.where(mark)[0]
+        ax.errorbar(
+            diag.r[idx][sel], y[sel],
+            xerr=[diag.r[idx][sel] - diag.lo[idx][sel], diag.hi[idx][sel] - diag.r[idx][sel]],
+            fmt="o", markersize=3, linewidth=1, capsize=2, color=colour,
+            ecolor=colour, alpha=0.9, label=label,
+        )
+
+    ax.axvline(threshold, linestyle="--", linewidth=0.8, color="#c1440e", alpha=0.6)
+    ax.axvline(0.0, linewidth=0.6, color="#333333", alpha=0.5)
+    ax.set_yticks([])
+    ax.set_xlabel("item-total correlation (95% bootstrap interval)")
+    ax.set_ylabel(f"{len(idx)} lowest-scoring questions")
+    ax.set_title(f"{int(confident.sum())} of these {len(idx)} are confidently uninformative")
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
+    for s_ in ("top", "right", "left"):
+        ax.spines[s_].set_visible(False)
     return ax

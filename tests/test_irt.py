@@ -12,7 +12,7 @@ from scipy.special import expit
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from livebench_irt.irt import fit_2pl, flag_bad_items  # noqa: E402
+from livebench_irt.irt import fit_2pl  # noqa: E402
 
 
 def simulate(n_models=60, n_items=400, seed=0, n_dead=10):
@@ -55,9 +55,14 @@ def test_recovers_difficulty():
 
 
 def test_finds_planted_dead_items():
+    # A fixed cutoff on `a` is used here and nowhere else. Inside a simulation
+    # the true parameters are known, so the cutoff is checking that the fitter
+    # recovers them. On real data the same cutoff is not usable -- `a` is not
+    # comparable across fits -- which is why the shipped diagnostic is the
+    # item-total correlation in diagnostics.py instead.
     Y, theta, a, b = simulate(n_dead=10)
     fit = fit_2pl(Y)
-    flagged = {int(i) for i, _, _ in flag_bad_items(fit, a_threshold=0.15)}
+    flagged = set(np.where(fit.a < 0.15)[0])
     hits = len(flagged & set(range(10)))
     print(f"planted dead items recovered: {hits}/10, false positives: {len(flagged) - hits}")
     assert hits >= 8

@@ -22,10 +22,7 @@ from livebench_irt.irt import (  # noqa: E402
     rank_confidence_sets,
 )
 from livebench_irt.load import build_matrix, load_judgments, raw_leaderboard  # noqa: E402
-from livebench_irt.plots import (  # noqa: E402
-    difficulty_discrimination,
-    leaderboard_with_error_bars,
-)
+from livebench_irt.plots import item_diagnostics, leaderboard_with_error_bars  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 FIGURES = ROOT / "figures"
@@ -51,10 +48,6 @@ if __name__ == "__main__":
     ax = leaderboard_with_error_bars(fit, boot)
     ax.figure.tight_layout()
     ax.figure.savefig(FIGURES / f"leaderboard{suffix}.png", dpi=200)
-
-    ax = difficulty_discrimination(fit)
-    ax.figure.tight_layout()
-    ax.figure.savefig(FIGURES / f"items{suffix}.png", dpi=200)
 
     # ---- the tables that go in the email --------------------------------
     mean_score = raw_leaderboard(df, category=category)
@@ -82,6 +75,10 @@ if __name__ == "__main__":
     unsure = pd.DataFrame(diag.inconclusive(threshold=R_THRESHOLD), columns=cols)
     weak.to_csv(ROOT / f"weak_questions{suffix}.csv", index=False)
     unsure.to_csv(ROOT / f"inconclusive_questions{suffix}.csv", index=False)
+
+    ax = item_diagnostics(diag, threshold=R_THRESHOLD)
+    ax.figure.tight_layout()
+    ax.figure.savefig(FIGURES / f"items{suffix}.png", dpi=200)
 
     # how many published adjacent pairs are actually indistinguishable?
     ranked = table[~table.separated].reset_index(drop=True)

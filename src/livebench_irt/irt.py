@@ -230,17 +230,6 @@ def rank_confidence_sets(boot_theta, level=0.95):
     return lo, hi
 
 
-def flag_bad_items(fit, a_threshold=0.15):
-    """Items that carry (almost) no information about model ability.
-
-    Separated items are excluded: every model got them right or every model got
-    them wrong, so their discrimination is not estimated from anything.
-    """
-    idx = np.where((fit.a < a_threshold) & ~fit.separated_items)[0]
-    order = idx[np.argsort(fit.a[idx])]
-    return [(fit.items[i], float(fit.a[i]), float(fit.b[i])) for i in order]
-
-
 def _logit(p, eps=1e-3):
     p = np.clip(p, eps, 1 - eps)
     return np.log(p / (1 - p))
