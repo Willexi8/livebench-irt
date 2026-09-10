@@ -9,7 +9,9 @@ much of the published ordering is real, and which questions are carrying signal.
 
 The short version of what came out: **the benchmark measures precisely, the
 leaderboard ordering is much coarser than it looks, and how a task is scored
-matters more for question quality than how well the question was written.**
+matters more for question quality than how well the question was written.** Five
+further patterns looked real and did not survive checking; they are listed below
+too, because the checks are the work.
 
 ## Data
 
@@ -87,8 +89,6 @@ Among binary-scored tasks, the whole distribution of item discrimination moves:
 | coding_completion | 50 | 0.429 | 0.151 | 0.344 |
 | LCB_generation (test cases) | 73 | 0.483 | 0.151 | 0.427 |
 
-![Item discrimination by task, binary-scored only](figures/task_discrimination_binary.png)
-
 Kruskal-Wallis H = 28.6, p = 6.3 × 10⁻⁷. Pairwise with Holm correction: typos
 vs LCB_generation, gap −0.142, p < 0.0001; typos vs coding_completion, gap
 −0.088, p = 0.0046. (coding_completion vs LCB_generation, p = 0.058 — same
@@ -111,6 +111,57 @@ discrimination of all (0.574). Suggestive of finer scoring retaining more
 information, but not comparable to the binary tasks, so it is not offered as
 evidence.
 
+### 4. Joint MLE inflates the item parameter scale; marginal MLE does not
+
+Joint MLE estimates an ability parameter for every model alongside the item
+parameters, so the parameter count grows with the sample and the item estimates
+are not consistent. `src/livebench_irt/mml.py` implements the standard
+alternative: treat ability as a N(0, 1) random effect, integrate it out with
+Gauss-Hermite quadrature, and run EM, leaving two parameters per item however
+many models there are. Ability comes back afterwards as a posterior mean.
+
+Simulation at the real dimensions shows the difference is a **scale** bias,
+which correlation cannot detect because correlation is scale-invariant. Mean
+estimated discrimination divided by the truth, on a panel with a third of cells
+missing:
+
+| questions | joint MLE | marginal MLE |
+|---|---|---|
+| 150 | 5.87 | 1.00 |
+| 300 | 1.51 | 1.02 |
+| 494 | 1.51 | 0.96 |
+
+On a fully observed panel joint MLE is not systematically worse, only unstable
+(0.98, 1.17, 1.32 at the three sizes), so the claim is scoped to sparse panels
+-- which is the regime here, at 67% observed.
+
+On the real data the two estimators agree about the ranking and disagree about
+the scale, exactly as the simulation predicts: ability correlates at 0.985
+(Spearman 0.999, median rank shift 1 place, max 16), while mean discrimination
+is 2.56 under joint MLE against 1.83 under marginal, and its standard deviation
+2.9x against 1.5x.
+
+Marginal MLE also handles separation without special-casing: a posterior mean is
+an average against a proper prior, not a maximiser, so the all-zero model gets a
+finite θ = −4.62 with posterior sd 0.49 where the joint MLE does not exist.
+
+### Robustness
+
+The finding in section 3 does not depend on the estimator. Mean item-total
+correlation by task, computed against each ability estimate:
+
+| task | joint MLE | marginal MLE |
+|---|---|---|
+| typos | 0.341 | 0.339 |
+| coding_completion | 0.429 | 0.444 |
+| LCB_generation | 0.483 | 0.491 |
+
+The typos-to-LCB_generation gap is 0.142 under joint MLE and 0.152 under
+marginal. Across all questions the two versions of the diagnostic correlate at
+0.986, and 6 of 487 questions cross the flagging threshold when the estimator
+changes -- all of them from the sparsest batch, answered by 69 of 178 models,
+which is where joint MLE is expected to be worst.
+
 ## What did not survive
 
 Four earlier findings were discarded after checking. They are listed because the
@@ -125,6 +176,13 @@ checks are part of the result:
 - **"Partial credit distorts the ability scale nonlinearly."** The Pearson
   correlation was wrecked by a single divergent point (see Separation below);
   the Spearman correlation was 0.993 throughout.
+- **"There are duplicate questions in the data."** Two question pairs correlate
+  at 1.000 across models, out of 121,771 pairs. Both pairs sit at the ceiling
+  (mean scores 0.96 to 0.99), and the entire evidence is that one or two of the
+  weakest models failed both members of a pair -- `mistral-large`, which averages
+  0.019 across everything it attempted, appears in both. Fisher's exact gives
+  p = 0.014 and p = 0.0004, neither of which survives the Bonferroni threshold of
+  4 x 10⁻⁷ implied by selecting the top pairs out of 121,771. No duplicates found.
 - **"`typos` questions fail because the texts are long."** Flagged questions
   averaged 1070 characters against 1095 unflagged, p = 0.66. Neither the number
   of corrections (p = 0.77), the number of word-boundary errors (p = 0.24), nor
@@ -137,11 +195,10 @@ questions are indistinguishable on every text feature measured.
 
 ## Limitations
 
-- **Joint MLE is inconsistent in the item parameters.** Each question's
-  parameters are estimated from as many observations as there are models — the
-  classic incidental-parameters setting. Simulated recovery of difficulty: 0.81
-  at 60 models, 0.94 at 120, 0.96 at 300. With 178 models this is tolerable but
-  not clean; marginal MLE is the correct fix.
+- **Joint MLE is inconsistent in the item parameters** — addressed, not removed.
+  Marginal MLE is implemented and the two estimators are compared in section 4;
+  the joint fit is kept as the default because it is faster and the ranking is
+  unaffected, but item parameter *values* from it should not be trusted.
 - **Unidimensionality is assumed and is likely wrong.** Coding and language
   ability are not one latent trait. Per-task fits are a crude check; a
   multidimensional model is the honest version.
@@ -150,8 +207,10 @@ questions are indistinguishable on every text feature measured.
   few-level ordinal, one is continuous. The correct tools are a generalised
   partial credit model and a beta response model respectively; neither is
   implemented.
-- **Local independence is assumed.** Questions drawn from the same source
-  article are not independent given ability.
+- **Local independence is assumed.** Checked at the pairwise level: of 121,771
+  question pairs, none correlate above 0.95 except two ceiling pairs explained
+  above. That rules out near-duplicate questions; it does not rule out weaker
+  dependence among questions built from the same source article.
 - **Text is recoverable for only half the `typos` questions** (50 of 100) — the
   rest were retired and are no longer distributed. Flagging rates in the two
   halves are 26% and 20% (Fisher p = 0.64), so no selection bias is detectable,
@@ -183,6 +242,7 @@ pip install -r requirements.txt
 
 python tests/test_irt.py
 python tests/test_diagnostics.py
+python tests/test_mml.py
 
 python scripts/00_smoke_test.py     # synthetic data with known parameters
 python scripts/02_fit_irt.py        # verify the pipeline before the real download
@@ -196,6 +256,7 @@ python scripts/02_fit_irt.py             # ability, intervals, item diagnostics
 python scripts/03_check_convergence.py   # are the intervals convergence-stable
 python scripts/04_typos_mechanism.py     # text features of flagged questions
 python scripts/05_task_discrimination.py # discrimination by task
+python scripts/06_compare_estimators.py  # joint vs marginal MLE
 ```
 
 `02_fit_irt.py` takes a few minutes: 200 bootstrap refits with no progress
@@ -207,9 +268,10 @@ output. It is working.
 src/livebench_irt/
     irt.py           2PL fit, bootstrap, rank confidence sets, separation
     diagnostics.py   item-total correlation with bootstrap intervals
+    mml.py           marginal MLE: EM over Gauss-Hermite quadrature, EAP ability
     load.py          download, cache, reshape into a score matrix
     plots.py         leaderboard with error bars, difficulty-discrimination map
-scripts/             00 smoke test, 01 download, 02 main, 03-05 as above
+scripts/             00 smoke test, 01 download, 02 main, 03-06 as above
 tests/               parameter recovery, separation, scale invariance
 ```
 
